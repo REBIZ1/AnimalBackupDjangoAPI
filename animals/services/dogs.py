@@ -23,7 +23,7 @@ def add_all_sub_breed(func):
                 for sub in sub_breeds:
                     sub_image = Dogs._get_image(f"{breed}/{sub}")
                     result[breed]['sub_breeds'][sub] = {
-                        'filename': f"{breed}_{sub}.jpg",
+                        'filename': f'{breed}_{sub}',
                         'size_bytes': len(sub_image) if sub_image else 0,
                         'image': sub_image
                     }
@@ -82,7 +82,7 @@ class Dogs:
             return None
         return {
             breed: {
-                'filename': f"{breed}.jpg",
+                'filename': breed,
                 'size_bytes': len(image),
                 'image': image
             }

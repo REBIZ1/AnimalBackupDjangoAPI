@@ -22,7 +22,7 @@ class Cats:
             response.raise_for_status()
             image = response.content
             result = {
-                'filename': f"{text}.jpg",
+                'filename': text,
                 'size_bytes': len(image),
                 'image': image
             }
