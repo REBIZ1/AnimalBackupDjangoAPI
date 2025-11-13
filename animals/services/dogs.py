@@ -1,6 +1,8 @@
 import requests
 from functools import wraps
-from pprint import pprint
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def add_all_sub_breed(func):
@@ -22,14 +24,17 @@ def add_all_sub_breed(func):
                 result[breed]['sub_breeds'] = {}
                 for sub in sub_breeds:
                     sub_image = Dogs._get_image(f"{breed}/{sub}")
-                    result[breed]['sub_breeds'][sub] = {
-                        'filename': f'{breed}_{sub}',
-                        'size_bytes': len(sub_image) if sub_image else 0,
-                        'image': sub_image
-                    }
+                    if sub_image:
+                        result[breed]['sub_breeds'][sub] = {
+                            'filename': f'{breed}_{sub}',
+                            'size_bytes': len(sub_image) if sub_image else 0,
+                            'image': sub_image
+                        }
+                        logger.info(f"Картинка подпороды {breed}_{sub} получена")
+                    else:
+                        logger.warning(f"Не удалось получить картинку подпороды {breed}_{sub}")
         except requests.exceptions.RequestException as e:
-            print('Ошибка при получении подпород:', e)
-
+            logger.error(f"Ошибка при получении подпород {breed}: {e}")
         return result
     return wrapper
 
@@ -43,7 +48,7 @@ class Dogs:
     @staticmethod
     def _get_image(breed: str):
         """
-        Загружает изображение для указанной породы или подпороды.
+        Получает изображение (bytes) для указанной породы или подпороды.
         Args:
             breed (str): название породы или подпороды
         Returns:
@@ -56,14 +61,15 @@ class Dogs:
             data = response.json()
             image_url = data['message']
             if not image_url:
+                logger.warning(f"Нет изображения для {breed}")
                 return None
 
-            # Загружаем картинку
+            # Получает картинку
             image_res = requests.get(image_url, timeout=10)
             image_res.raise_for_status()
             return image_res.content
         except requests.exceptions.RequestException as e:
-            print('Ошибка при получении картинки:', e)
+            logger.error(f"Ошибка при получении картинки для {breed}: {e}")
             return None
 
 
@@ -79,7 +85,10 @@ class Dogs:
         """
         image = Dogs._get_image(breed)
         if not image:
+            logger.error(f"Не удалось получить изображение для основной породы: {breed}")
             return None
+
+        logger.info(f"Изображение основной породы {breed} получено успешно")
         return {
             breed: {
                 'filename': breed,
@@ -88,6 +97,3 @@ class Dogs:
             }
         }
 
-
-result = Dogs.get_dog('hound')
-pprint(result)

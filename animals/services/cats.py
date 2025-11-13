@@ -1,4 +1,7 @@
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Cats:
@@ -26,9 +29,10 @@ class Cats:
                 'size_bytes': len(image),
                 'image': image
             }
+            logger.info(f'Получена картинка с текстом: {text}')
             return result
         except requests.exceptions.RequestException as e:
-            print('Ошибка при получении картинки:', e)
+            logger.error(f'Ошибка при получении картинки с текстом: {e}')
             return None
 
 

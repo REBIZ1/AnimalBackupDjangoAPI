@@ -1,10 +1,8 @@
-import os
 import requests
 import json
-from dotenv import load_dotenv
+import logging
 
-
-load_dotenv()
+logger = logging.getLogger(__name__)
 
 
 class YandexDisk:
@@ -33,17 +31,17 @@ class YandexDisk:
                 return {}
 
             response.raise_for_status()
-            print(f'Запрос {method} {endpoint} выполнен успешно!')
+            logger.info(f"Запрос {method} {endpoint} выполнен успешно!")
             return response.json() if response.content else {}
         except requests.exceptions.RequestException as e:
-            print(f'Ошибка при запросе {method} {endpoint}: {e}')
+            logger.error(f"Ошибка при запросе {method} {endpoint}: {e}")
             return None
 
     def _create_folder(self, folder_path: str):
         """Создание папки"""
         params = {'path': folder_path}
-        result = self._make_request('PUT', 'resources', params=params)
-
+        self._make_request('PUT', 'resources', params=params)
+        logger.info(f"Папка создана: {folder_path}")
 
     def create_folder(self, folder_path: str):
         """Создает папку или вложенную папку"""
@@ -72,10 +70,10 @@ class YandexDiskFileManager(YandexDisk):
             # Загружает файл
             put_response = requests.put(href, data=data)
             put_response.raise_for_status()
-            print(f'Файл {filename} успешно загружен!')
+            logger.info(f"Файл {filename} успешно загружен в {folder_path}")
             return True
         except requests.exceptions.RequestException as e:
-            print(f'Ошибка при загрузке {filename}:', e)
+            logger.error(f"Ошибка при загрузке {filename}: {e}")
             return False
 
     def upload_data(self, folder_path: str, image_data: dict):
@@ -99,9 +97,8 @@ class YandexDiskFileManager(YandexDisk):
                     'filename': filename,
                     'size_bytes': size_bytes
                 })
-                print(f'Файл {filename}.jpg успешно загружен!')
             except Exception as e:
-                print(f'Ошибка при загрузке файла {filename}.jpg: {e}')
+                logger.error(f"Ошибка при загрузке файла {filename}.jpg: {e}")
 
         # С одной картинкой (cataas.com)
         if 'image' in image_data:
@@ -118,8 +115,8 @@ class YandexDiskFileManager(YandexDisk):
         try:
             json_bytes = json.dumps(result, indent=4, ensure_ascii=False).encode('utf-8')
             self._upload_bytes(folder_path, "result.json", json_bytes)
-            print("JSON файл с результатами успешно загружен!")
+            logger.info("JSON файл с результатами успешно загружен!")
         except Exception as e:
-            print(f"Ошибка при загрузке JSON: {e}")
+            logger.error(f"Ошибка при загрузке JSON: {e}")
 
 
