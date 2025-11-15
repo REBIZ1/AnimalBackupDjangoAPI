@@ -20,6 +20,7 @@ class Cats:
             - size_bytes: размер картинки
             - image: байтовое содержимое картинки
         """
+        logger.info(f'Запрос картинки с текстом: {text}')
         try:
             response = requests.get(f'{Cats.base_url}/cat/says/{text}', timeout=10)
             response.raise_for_status()
