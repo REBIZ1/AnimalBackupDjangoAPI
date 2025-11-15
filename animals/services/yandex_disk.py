@@ -41,7 +41,7 @@ class YandexDisk:
         """Создание папки"""
         params = {'path': folder_path}
         self._make_request('PUT', 'resources', params=params)
-        logger.info(f"Папка создана: {folder_path}")
+        logger.info(f"Создана папка: {folder_path}")
 
     def create_folder(self, folder_path: str):
         """Создает папку или вложенную папку"""
@@ -84,7 +84,7 @@ class YandexDiskFileManager(YandexDisk):
         """
         result = []
 
-        def upload_single_image(image_data: dict):
+        def _upload_single_image(image_data: dict):
             """
             Вспомогательная функция для загрузки одного изображения и возврата json
             """
@@ -100,23 +100,31 @@ class YandexDiskFileManager(YandexDisk):
             except Exception as e:
                 logger.error(f"Ошибка при загрузке файла {filename}.jpg: {e}")
 
+        def _upload_json(image_data: dict):
+            """
+            Вспомогательная функция для загрузки json
+            """
+            filename = image_data['filename']
+            try:
+                json_bytes = json.dumps(result, indent=4, ensure_ascii=False).encode('utf-8')
+                self._upload_bytes(folder_path, f"{filename}.json", json_bytes)
+            except Exception as e:
+                logger.error(f"Ошибка при загрузке JSON: {e}")
+
         # С одной картинкой (cataas.com)
         if 'image' in image_data:
-            upload_single_image(image_data)
+            _upload_single_image(image_data)
+            _upload_json(image_data)
         # С несколькими картинками (dog.ceo)
         else:
             for breed_data in image_data.values():
-                upload_single_image(breed_data)
+                _upload_single_image(breed_data)
                 # если есть подпороды
                 if 'sub_breeds' in breed_data:
                     for sub_data in breed_data['sub_breeds'].values():
-                        upload_single_image(sub_data)
+                        _upload_single_image(sub_data)
+                _upload_json(breed_data)
 
-        try:
-            json_bytes = json.dumps(result, indent=4, ensure_ascii=False).encode('utf-8')
-            self._upload_bytes(folder_path, "result.json", json_bytes)
-            logger.info("JSON файл с результатами успешно загружен!")
-        except Exception as e:
-            logger.error(f"Ошибка при загрузке JSON: {e}")
+
 
 
