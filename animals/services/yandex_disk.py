@@ -1,4 +1,5 @@
-import requests
+import asyncio
+import aiohttp
 import json
 import logging
 
@@ -16,45 +17,59 @@ class YandexDisk:
             'Authorization': f'OAuth {self.token}',
             'Content-Type': 'application/json'
         }
+        self.session = None
 
-    def _make_request(self, method: str, endpoint: str, **kwargs):
+    async def __aenter__(self):
+        self.session = aiohttp.ClientSession()
+        return self
+
+    async def __aexit__(self, *args):
+        if self.session:
+            await self.session.close()
+
+    async def _ensure_session(self):
+        if self.session is None:
+            self.session = aiohttp.ClientSession()
+
+    async def _make_request(self, method: str, endpoint: str, **kwargs):
         """Метод для выполнения запросов"""
         url = f'{self.base_url}/{endpoint}'
         try:
-            response = requests.request(
+            async with self.session.request(
                 method=method,
                 url=url,
                 headers=self.headers,
                 **kwargs
-            )
-            if response.status_code == 409 and method == "PUT" and endpoint == "resources":
-                return {}
-
-            response.raise_for_status()
-            logger.info(f"Запрос {method} {endpoint} выполнен успешно!")
-            return response.json() if response.content else {}
-        except requests.exceptions.RequestException as e:
+            ) as response:
+                if response.status == 409:
+                    return {}
+                response.raise_for_status()
+                logger.info(f"Запрос {method} {endpoint} выполнен успешно!")
+                return await response.json()
+        except aiohttp.ClientError as e:
             logger.error(f"Ошибка при запросе {method} {endpoint}: {e}")
             return None
 
-    def _create_folder(self, folder_path: str):
+    async def _create_folder(self, folder_path: str):
         """Создание папки"""
         params = {'path': folder_path}
-        self._make_request('PUT', 'resources', params=params)
-        logger.info(f"Папка создана: {folder_path}")
+        await self._make_request('PUT', 'resources', params=params)
+        logger.info(f"Создана папка: {folder_path}")
 
-    def create_folder(self, folder_path: str):
+    async def create_folder(self, folder_path: str):
         """Создает папку или вложенную папку"""
+        await self._ensure_session()
+
         parts = folder_path.split('/')
         path = ''
         for part in parts:
             path = f'{path}/{part}' if path else part
-            self._create_folder(path)
+            await self._create_folder(path)
 
 
 class YandexDiskFileManager(YandexDisk):
     """Класс для загрузки файлов в яндекс диск"""
-    def _upload_bytes(self, folder_path: str, filename: str, data: bytes) -> bool:
+    async def _upload_bytes(self, folder_path: str, filename: str, data: bytes) -> bool:
         """Загрузка файла на яндекс диск"""
         try:
             # Получает ссылку для загрузки
@@ -63,28 +78,32 @@ class YandexDiskFileManager(YandexDisk):
                 'path': f'{folder_path}/{filename}',
                 'overwrite': 'true'
             }
-            response = requests.get(url, headers=self.headers, params=params)
-            response.raise_for_status()
-            href = response.json().get('href')
+            async with self.session.get(url, headers=self.headers, params=params) as response:
+                response.raise_for_status()
+                href = (await response.json()).get('href')
+                if not href:
+                    return False
 
             # Загружает файл
-            put_response = requests.put(href, data=data)
-            put_response.raise_for_status()
-            logger.info(f"Файл {filename} успешно загружен в {folder_path}")
-            return True
-        except requests.exceptions.RequestException as e:
+            async with self.session.put(href, data=data) as put_response:
+                put_response.raise_for_status()
+                logger.info(f"Файл {filename} успешно загружен в {folder_path}")
+                return True
+        except aiohttp.ClientError as e:
             logger.error(f"Ошибка при загрузке {filename}: {e}")
             return False
 
-    def upload_data(self, folder_path: str, image_data: dict):
+    async def upload_data(self, folder_path: str, image_data: dict):
         """
         Универсальная загрузка данных:
         - Если передан один файл (api cataas.com), загружает 1 .jpg и 1 .json
         - Если передан словарь с подпородами (api dog.ceo) загружает все .jpg и общий .json
         """
+        await self._ensure_session()
+
         result = []
 
-        def upload_single_image(image_data: dict):
+        async def upload_single_image(image_data: dict):
             """
             Вспомогательная функция для загрузки одного изображения и возврата json
             """
@@ -92,7 +111,7 @@ class YandexDiskFileManager(YandexDisk):
                 filename = image_data['filename']
                 size_bytes = image_data['size_bytes']
                 image = image_data['image']
-                self._upload_bytes(folder_path, f'{filename}.jpg', image)
+                await self._upload_bytes(folder_path, f'{filename}.jpg', image)
                 result.append({
                     'filename': filename,
                     'size_bytes': size_bytes
@@ -100,21 +119,24 @@ class YandexDiskFileManager(YandexDisk):
             except Exception as e:
                 logger.error(f"Ошибка при загрузке файла {filename}.jpg: {e}")
 
+        tasks = []
+
         # С одной картинкой (cataas.com)
         if 'image' in image_data:
-            upload_single_image(image_data)
+            tasks.append(upload_single_image(image_data))
         # С несколькими картинками (dog.ceo)
         else:
             for breed_data in image_data.values():
-                upload_single_image(breed_data)
+                tasks.append(upload_single_image(breed_data))
                 # если есть подпороды
                 if 'sub_breeds' in breed_data:
                     for sub_data in breed_data['sub_breeds'].values():
-                        upload_single_image(sub_data)
+                        tasks.append(upload_single_image(sub_data))
 
+        await asyncio.gather(*tasks)
         try:
             json_bytes = json.dumps(result, indent=4, ensure_ascii=False).encode('utf-8')
-            self._upload_bytes(folder_path, "result.json", json_bytes)
+            await self._upload_bytes(folder_path, "result.json", json_bytes)
             logger.info("JSON файл с результатами успешно загружен!")
         except Exception as e:
             logger.error(f"Ошибка при загрузке JSON: {e}")
