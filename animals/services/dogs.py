@@ -1,9 +1,10 @@
-import requests
+import asyncio
+import aiohttp
 from functools import wraps
 import logging
 
 logger = logging.getLogger(__name__)
-
+timeout = aiohttp.ClientTimeout(total=10)
 
 def add_all_sub_breed(func):
     """
@@ -12,30 +13,35 @@ def add_all_sub_breed(func):
     и добавляет их в словарь с изображениями.
     """
     @wraps(func)
-    def wrapper(breed: str):
-        result = func(breed)
-        try:
-            response = requests.get(f'{Dogs.base_url}/breed/{breed}/list', timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            sub_breeds = data.get('message', [])
+    async def wrapper(breed: str):
+        async with aiohttp.ClientSession() as session:
+            result = await func(breed, session)
+            if result is None:
+                return None
+            try:
+                async with session.get(f'{Dogs.base_url}/breed/{breed}/list', timeout=timeout) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    sub_breeds = data.get('message', [])
 
-            if sub_breeds:
-                result[breed]['sub_breeds'] = {}
-                for sub in sub_breeds:
-                    sub_image = Dogs._get_image(f"{breed}/{sub}")
-                    if sub_image:
-                        result[breed]['sub_breeds'][sub] = {
-                            'filename': f'{breed}_{sub}',
-                            'size_bytes': len(sub_image) if sub_image else 0,
-                            'image': sub_image
-                        }
-                        logger.info(f"Картинка подпороды {breed}_{sub} получена")
-                    else:
-                        logger.warning(f"Не удалось получить картинку подпороды {breed}_{sub}")
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Ошибка при получении подпород {breed}: {e}")
-        return result
+                if sub_breeds:
+                    result[breed]['sub_breeds'] = {}
+                    # Создаем список корутин для подпород
+                    coroutines = [Dogs._get_image(f"{breed}/{sub}", session) for sub in sub_breeds]
+                    sub_images = await asyncio.gather(*coroutines)
+                    for sub, img in zip(sub_breeds, sub_images):
+                        if img:
+                            result[breed]['sub_breeds'][sub] = {
+                                'filename': f'{breed}_{sub}',
+                                'size_bytes': len(img),
+                                'image': img
+                            }
+                            logger.info(f"Картинка подпороды {breed}_{sub} получена")
+                        else:
+                            logger.warning(f"Не удалось получить картинку подпороды {breed}_{sub}")
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                logger.error(f"Ошибка при получении подпород {breed}: {e}")
+            return result
     return wrapper
 
 
@@ -46,7 +52,7 @@ class Dogs:
     base_url = 'https://dog.ceo/api'
 
     @staticmethod
-    def _get_image(breed: str):
+    async def _get_image(breed: str, session: aiohttp.ClientSession):
         """
         Получает изображение (bytes) для указанной породы или подпороды.
         Args:
@@ -56,26 +62,26 @@ class Dogs:
         """
         try:
             # Получаем JSON с ссылкой на картинку
-            response = requests.get(f'{Dogs.base_url}/breed/{breed}/images/random', timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            image_url = data['message']
-            if not image_url:
-                logger.warning(f"Нет изображения для {breed}")
-                return None
+            async with session.get(f'{Dogs.base_url}/breed/{breed}/images/random', timeout=timeout) as response:
+                response.raise_for_status()
+                data = await response.json()
+                image_url = data['message']
+                if not image_url:
+                    logger.warning(f"Нет изображения для {breed}")
+                    return None
 
             # Получает картинку
-            image_res = requests.get(image_url, timeout=10)
-            image_res.raise_for_status()
-            return image_res.content
-        except requests.exceptions.RequestException as e:
+            async with session.get(image_url, timeout=timeout) as image_res:
+                image_res.raise_for_status()
+                return await image_res.read()
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             logger.error(f"Ошибка при получении картинки для {breed}: {e}")
             return None
 
 
     @staticmethod
     @add_all_sub_breed
-    def get_dog(breed: str):
+    async def get_dog(breed: str, session: aiohttp.ClientSession):
         """
         Получает изображение для основной породы
         Args:
@@ -83,7 +89,7 @@ class Dogs:
         Returns:
             dict или None: словарь с информацией о породе
         """
-        image = Dogs._get_image(breed)
+        image = await Dogs._get_image(breed, session)
         if not image:
             logger.error(f"Не удалось получить изображение для основной породы: {breed}")
             return None
