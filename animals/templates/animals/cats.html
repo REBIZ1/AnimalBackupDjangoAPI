@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Коты API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 30px;
+            max-width: 700px;
+            margin: auto;
+        }
+        .card {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #888;
+            margin-top: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            border-radius: 6px;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: #4a8ef5;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #3a74ce;
+        }
+        .btn-green {
+            background: #37a759;
+            color: white;
+        }
+        .btn-green:hover {
+            background: #2d8748;
+        }
+        img {
+            max-width: 100%;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Коты API</h2>
+
+<div class="card">
+    <form action="{% url 'get_cat_image' %}" method="POST">
+        {% csrf_token %}
+
+        <label>Текст для картинки:</label><br>
+        <input type="text" name="text" value="{{ text_value|default:'' }}" placeholder="Введите текст">
+
+        <br><br>
+
+        <label>Путь на Яндекс.Диске:</label><br>
+        <input type="text" name="path" value="{{ path_value|default:'pd-fpy_138/Cats' }}">
+
+        <br><br>
+
+        <button type="submit" class="btn-primary">Получить картинку</button>
+    </form>
+</div>
+
+<div class="card">
+    <form action="{% url 'upload_cat_to_disk' %}" method="POST">
+        {% csrf_token %}
+        <button type="submit" class="btn-green" {% if not image_b64 %}disabled{% endif %}>
+            Загрузить на Яндекс.Диск
+        </button>
+    </form>
+</div>
+
+{% if image_b64 %}
+<div class="card">
+    <h3>Полученная картинка:</h3>
+    <img src="data:image/jpeg;base64,{{ image_b64 }}">
+</div>
+{% endif %}
+
+</body>
+</html>
