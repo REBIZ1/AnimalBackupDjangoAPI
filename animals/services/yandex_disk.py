@@ -103,7 +103,7 @@ class YandexDiskFileManager(YandexDisk):
 
         result = []
 
-        async def upload_single_image(image_data: dict):
+        async def _upload_single_image(image_data: dict):
             """
             Вспомогательная функция для загрузки одного изображения и возврата json
             """
@@ -119,26 +119,31 @@ class YandexDiskFileManager(YandexDisk):
             except Exception as e:
                 logger.error(f"Ошибка при загрузке файла {filename}.jpg: {e}")
 
+        async def _upload_json(filename: str):
+            try:
+                json_bytes = json.dumps(result, indent=4, ensure_ascii=False).encode('utf-8')
+                await self._upload_bytes(folder_path, f"{filename}.json", json_bytes)
+                logger.info(f"Файл {filename}.json успешно загружен!")
+            except Exception as e:
+                logger.error(f"Ошибка при загрузке JSON: {e}")
+
         tasks = []
 
         # С одной картинкой (cataas.com)
         if 'image' in image_data:
-            tasks.append(upload_single_image(image_data))
-        # С несколькими картинками (dog.ceo)
+            tasks.append(_upload_single_image(image_data))
+            await asyncio.gather(*tasks)
+            await _upload_json(image_data['filename'])
+            # С несколькими картинками (dog.ceo)
         else:
             for breed_data in image_data.values():
-                tasks.append(upload_single_image(breed_data))
+                tasks.append(_upload_single_image(breed_data))
                 # если есть подпороды
                 if 'sub_breeds' in breed_data:
                     for sub_data in breed_data['sub_breeds'].values():
-                        tasks.append(upload_single_image(sub_data))
+                        tasks.append(_upload_single_image(sub_data))
+            await asyncio.gather(*tasks)
+            await _upload_json('result')
 
-        await asyncio.gather(*tasks)
-        try:
-            json_bytes = json.dumps(result, indent=4, ensure_ascii=False).encode('utf-8')
-            await self._upload_bytes(folder_path, "result.json", json_bytes)
-            logger.info("JSON файл с результатами успешно загружен!")
-        except Exception as e:
-            logger.error(f"Ошибка при загрузке JSON: {e}")
 
 
