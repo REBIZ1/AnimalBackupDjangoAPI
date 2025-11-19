@@ -18,17 +18,30 @@
 git clone git@github.com:REBIZ1/AnimalBackupDjangoAPI.git
 ```
 
-### 2. Установка зависимостей
+### 2. Создание и активация виртуального окружения (обязательно!)
 ```
+# Создаём venv
+python -m venv venv
+
+# Активируем
+# Windows:
+venv\Scripts\activate
+# macOS / Linux:
+source venv/bin/activate
+```
+
+### 3. Обновление pip и установка зависимостей
+```
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 3. Выполнить миграции (обязательно перед запуском!)
+### 4. Выполнить миграции (обязательно перед запуском!)
 ```
 python manage.py migrate
 ```
 
-### 4. Запуск сервера
+### 5. Запуск сервера
 ```
 python manage.py runserver
 ```
@@ -61,3 +74,4 @@ http://127.0.0.1:8000/
 - Автоматическая загрузка изображений подпород
 - Отображение картинок
 - Загрузка всех изображений + JSON на яндекс диск
+
