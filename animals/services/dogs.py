@@ -13,7 +13,7 @@ def add_all_sub_breed(func):
     и добавляет их в словарь с изображениями.
     """
     @wraps(func)
-    async def wrapper(breed: str):
+    async def wrapper(breed: str, session: aiohttp.ClientSession):
         async with aiohttp.ClientSession() as session:
             result = await func(breed, session)
             if result is None:
@@ -103,3 +103,19 @@ class Dogs:
             }
         }
 
+    @staticmethod
+    async def get_all_breeds():
+        """
+        Получает список всех пород собак.
+        """
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{Dogs.base_url}/breeds/list/all", timeout=timeout) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    breeds_dict = data.get("message", {})
+                    return list(breeds_dict.keys())
+
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            logger.error(f"Ошибка при получении списка пород: {e}")
+            return None
