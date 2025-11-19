@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>API менеджер</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 30px;
+            max-width: 600px;
+            margin: auto;
+        }
+        .card {
+            padding: 20px;
+            border-radius: 8px;
+            background: #f2f2f2;
+            margin-bottom: 20px;
+        }
+        .buttons {
+            display: flex;
+            gap: 15px;
+        }
+        button, input[type="submit"] {
+            padding: 10px 20px;
+            font-size: 15px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .btn-primary {
+            background: #4a8ef5;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #3a74ce;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Менеджер API</h2>
+
+<div class="card">
+    <form action="{% url 'save_token' %}" method="POST">
+        {% csrf_token %}
+
+        <label>Введите токен Яндекс.Диска:</label><br><br>
+
+        <input type="text" name="token"
+               value="{{ token|default:'' }}"
+               placeholder="OAuth токен"
+               style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #999;">
+
+        <br><br>
+
+        <input class="btn-primary" type="submit" value="Сохранить токен">
+    </form>
+</div>
+
+<div class="card">
+    <h3>Выберите API:</h3>
+
+    <div class="buttons">
+        <form action="{% url 'cats_page' %}" method="GET">
+            <button class="btn-primary" {% if not token_exists %}disabled{% endif %}>Коты</button>
+        </form>
+
+        <form action="{% url 'dogs_page' %}" method="GET">
+            <button class="btn-primary" {% if not token_exists %}disabled{% endif %}>Собаки</button>
+        </form>
+    </div>
+
+    {% if not token_exists %}
+        <p style="color: #cc0000; margin-top: 10px;">Введите токен, чтобы продолжить.</p>
+    {% endif %}
+</div>
+
+</body>
+</html>
