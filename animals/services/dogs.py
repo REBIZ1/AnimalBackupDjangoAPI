@@ -14,34 +14,33 @@ def add_all_sub_breed(func):
     """
     @wraps(func)
     async def wrapper(breed: str, session: aiohttp.ClientSession):
-        async with aiohttp.ClientSession() as session:
-            result = await func(breed, session)
-            if result is None:
-                return None
-            try:
-                async with session.get(f'{Dogs.base_url}/breed/{breed}/list', timeout=timeout) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-                    sub_breeds = data.get('message', [])
+        result = await func(breed, session)
+        if result is None:
+            return None
+        try:
+            async with session.get(f'{Dogs.base_url}/breed/{breed}/list', timeout=timeout) as response:
+                response.raise_for_status()
+                data = await response.json()
+                sub_breeds = data.get('message', [])
 
-                if sub_breeds:
-                    result[breed]['sub_breeds'] = {}
-                    # Создаем список корутин для подпород
-                    coroutines = [Dogs._get_image(f"{breed}/{sub}", session) for sub in sub_breeds]
-                    sub_images = await asyncio.gather(*coroutines)
-                    for sub, img in zip(sub_breeds, sub_images):
-                        if img:
-                            result[breed]['sub_breeds'][sub] = {
-                                'filename': f'{breed}_{sub}',
-                                'size_bytes': len(img),
-                                'image': img
-                            }
-                            logger.info(f"Картинка подпороды {breed}_{sub} получена")
-                        else:
-                            logger.warning(f"Не удалось получить картинку подпороды {breed}_{sub}")
-            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-                logger.error(f"Ошибка при получении подпород {breed}: {e}")
-            return result
+            if sub_breeds:
+                result[breed]['sub_breeds'] = {}
+                # Создаем список корутин для подпород
+                coroutines = [Dogs._get_image(f"{breed}/{sub}", session) for sub in sub_breeds]
+                sub_images = await asyncio.gather(*coroutines)
+                for sub, img in zip(sub_breeds, sub_images):
+                    if img:
+                        result[breed]['sub_breeds'][sub] = {
+                            'filename': f'{breed}_{sub}',
+                            'size_bytes': len(img),
+                            'image': img
+                        }
+                        logger.info(f"Картинка подпороды {breed}_{sub} получена")
+                    else:
+                        logger.warning(f"Не удалось получить картинку подпороды {breed}_{sub}")
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            logger.error(f"Ошибка при получении подпород {breed}: {e}")
+        return result
     return wrapper
 
 
